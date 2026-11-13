@@ -162,5 +162,11 @@ private:
 // Função livre (não membro de classe) porque não precisa de estado.
 // 'inline': definida no header sem causar "multiple definition" no linker.
 inline std::string defaultSavePath() {
+#ifdef __EMSCRIPTEN__
+    // No navegador, /save é montado sobre o IndexedDB (IDBFS) em main_sdl.cpp,
+    // então o recorde continua salvo entre visitas à página.
+    return "/save/2048_save.dat";
+#else
     return "2048_save.dat";
+#endif
 }

@@ -90,6 +90,12 @@ private:
     Uint32      msgUntil_ = 0;
     bool        closed_   = false;
 
+    // gesto de deslizar (mouse ou toque)
+    static constexpr int SWIPE_MIN = 30;  // pixels mínimos para contar como movimento
+    bool swiping_ = false;
+    int  swipeX_  = 0;
+    int  swipeY_  = 0;
+
     void layout();
     void stepAnims();
     void drawBg();

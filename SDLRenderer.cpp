@@ -9,6 +9,7 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <cstdlib>
 
 // ── Paleta de cores ───────────────────────────────────────────────────────────
 namespace P {
@@ -71,6 +72,12 @@ SDLRenderer::SDLRenderer() {
     if (!ren_) throw std::runtime_error(std::string("CreateRenderer: ") + SDL_GetError());
 
     SDL_SetRenderDrawBlendMode(ren_.get(), SDL_BLENDMODE_BLEND);
+
+#ifdef __EMSCRIPTEN__
+    // Em telas de alta densidade o canvas tem mais pixels que a janela lógica;
+    // o tamanho lógico faz o SDL escalar o desenho para ocupar o canvas todo.
+    SDL_RenderSetLogicalSize(ren_.get(), WIN_W, WIN_H);
+#endif
 
     // Tenta carregar fontes do sistema (Ubuntu tem DejaVu por padrão)
     auto tryF = [](std::initializer_list<const char*> paths, int sz) -> TTF_Font* {
@@ -159,8 +166,13 @@ void SDLRenderer::drawHeader(int score, int best, int moves) {
 
     txt("Movimentos: " + std::to_string(moves),
         fSml_, P::MUTED, {20, 74, 350, 18}, false);
+#ifdef __EMSCRIPTEN__
+    txt("WASD / setas / deslizar  |  Z desfazer  |  R reiniciar",
+        fSml_, P::MUTED, {20, 92, 430, 16}, false);
+#else
     txt("WASD / setas  |  Z desfazer  |  R reiniciar  |  Q sair",
         fSml_, P::MUTED, {20, 92, 430, 16}, false);
+#endif
 }
 
 // ── drawBoard ─────────────────────────────────────────────────────────────────
@@ -295,8 +307,25 @@ char SDLRenderer::pollInput() {
             case SDLK_d: case SDLK_RIGHT:  return 'd';
             case SDLK_z:                   return 'z';
             case SDLK_r:                   return 'r';
+#ifndef __EMSCRIPTEN__
+            // no navegador não existe "fechar a janela"
             case SDLK_q: case SDLK_ESCAPE: closed_=true; return 'q';
+#endif
             default: break;
+            }
+        }
+        // Deslizar com o mouse ou o dedo (o SDL converte toque em mouse):
+        // a direção é o eixo dominante entre o ponto inicial e o final.
+        if (ev.type == SDL_MOUSEBUTTONDOWN && ev.button.button == SDL_BUTTON_LEFT) {
+            swipeX_ = ev.button.x; swipeY_ = ev.button.y; swiping_ = true;
+        }
+        if (ev.type == SDL_MOUSEBUTTONUP && ev.button.button == SDL_BUTTON_LEFT && swiping_) {
+            swiping_ = false;
+            int dx = ev.button.x - swipeX_;
+            int dy = ev.button.y - swipeY_;
+            if (std::max(std::abs(dx), std::abs(dy)) >= SWIPE_MIN) {
+                if (std::abs(dx) > std::abs(dy)) return dx > 0 ? 'd' : 'a';
+                return dy > 0 ? 's' : 'w';
             }
         }
     }
