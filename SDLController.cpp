@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 
 SDLController::SDLController()
     : logic_(std::make_unique<GameLogic<BOARD_N>>())
@@ -20,18 +23,31 @@ SDLController::SDLController()
 }
 
 void SDLController::run() {
+    start();
+    while (step()) {}
+    finish();
+}
+
+void SDLController::start() {
     loadSave();
-    while (running_) {
-        char c = sdl_->pollInput();
-        if (sdl_->closed()) break;
-        if (c != '\0') handleInput(c);
-        int best = std::max(save_.bestScore, logic_->best());
-        rend_->render(logic_->grid(), logic_->score(), best, logic_->moves());
-        if (logic_->hasWon() && !logic_->isOver())
-            rend_->showMsg("Voce venceu! Continue jogando...");
-        if (logic_->isOver())
-            rend_->showMsg("Game Over!  Pressione R para reiniciar.", true);
-    }
+}
+
+bool SDLController::step() {
+    if (!running_) return false;
+    char c = sdl_->pollInput();
+    if (sdl_->closed()) return false;
+    if (c != '\0') handleInput(c);
+    if (!running_) return false;
+    int best = std::max(save_.bestScore, logic_->best());
+    rend_->render(logic_->grid(), logic_->score(), best, logic_->moves());
+    if (logic_->hasWon() && !logic_->isOver())
+        rend_->showMsg("Voce venceu! Continue jogando...");
+    if (logic_->isOver())
+        rend_->showMsg("Game Over!  Pressione R para reiniciar.", true);
+    return true;
+}
+
+void SDLController::finish() {
     syncSave();
     writeSave();
     if (auto s = stats_.lock()) s->print();
@@ -42,9 +58,10 @@ void SDLController::handleInput(char c) {
     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     if (auto dir = charToDir(c)) {
         prev_ = logic_->grid();
-        if (logic_->applyMove(*dir))
+        if (logic_->applyMove(*dir)) {
             fireAnims(prev_, logic_->grid());
-        else
+            saveBestIfImproved();
+        } else
             rend_->showMsg("Nenhuma peca se moveu.", true);
         return;
     }
@@ -97,7 +114,24 @@ void SDLController::loadSave() {
         rend_->showMsg("Recorde anterior: " + std::to_string(save_.bestScore));
     }
 }
-void SDLController::writeSave() { persist_.save(save_); }
+void SDLController::writeSave() {
+    persist_.save(save_);
+#ifdef __EMSCRIPTEN__
+    // copia o MEMFS para o IndexedDB do navegador
+    EM_ASM( FS.syncfs(false, function (err) { if (err) console.warn("syncfs:", err); }); );
+#endif
+}
+
+// No navegador a página pode ser fechada a qualquer momento, sem passar por
+// finish(); então o recorde é gravado assim que ele é superado.
+void SDLController::saveBestIfImproved() {
+#ifdef __EMSCRIPTEN__
+    if (logic_->best() > save_.bestScore) {
+        save_.bestScore = logic_->best();
+        writeSave();
+    }
+#endif
+}
 void SDLController::syncSave() {
     save_.bestScore = std::max(save_.bestScore, logic_->best());
     save_.totalGames++;
