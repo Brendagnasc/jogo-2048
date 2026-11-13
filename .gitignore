@@ -1,4 +1,4 @@
-﻿*.o
+*.o
 2048
 2048_sdl
 2048_save.dat
@@ -6,4 +6,3 @@
 # saída do Emscripten (gerada no GitHub Actions)
 web/2048.js
 web/2048.wasm
-
