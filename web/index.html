@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>2048 em C++</title>
+  <meta name="description" content="2048 em C++17 com SDL2, compilado para WebAssembly.">
+  <style>
+    :root {
+      --fundo: #0c0c12;
+      --painel: #181824;
+      --borda: #2a2a3c;
+      --texto: #f5eede;
+      --suave: #69647a;
+      --ouro: #ffbe32;
+      --mono: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--fundo);
+      color: var(--texto);
+      font-family: var(--mono);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      gap: 12px;
+    }
+    .voltar-hub { align-self: flex-start; color: var(--suave); text-decoration: none; font-size: 13px; }
+    .voltar-hub:hover { color: var(--ouro); }
+    #palco { position: relative; width: 100%; max-width: 860px; }
+    canvas {
+      display: block;
+      /* o SDL define largura/altura em pixels no estilo do canvas;
+         !important deixa ele se ajustar à tela (o SDL corrige o mouse) */
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 860 / 680;
+      border-radius: 12px;
+      background: var(--fundo);
+      touch-action: none; /* deslizar no celular não rola a página */
+      outline: none;
+    }
+    #carregando {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--suave);
+      font-size: 14px;
+    }
+    .controles { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .controles button {
+      font-family: var(--mono);
+      font-weight: bold;
+      font-size: 14px;
+      min-width: 48px;
+      padding: 10px 14px;
+      background: var(--painel);
+      color: var(--texto);
+      border: 1px solid var(--borda);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .controles button:hover { border-color: var(--ouro); color: var(--ouro); }
+    .rodape { color: var(--suave); font-size: 12px; text-align: center; max-width: 600px; }
+  </style>
+</head>
+<body>
+  <a class="voltar-hub" href="https://brendagnasc.github.io/jogos/">← Todos os jogos</a>
+
+  <div id="palco">
+    <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="carregando">Carregando WebAssembly...</div>
+  </div>
+
+  <!-- botões para quem não tem teclado; chamam o C++ direto (web_tecla) -->
+  <div class="controles">
+    <button data-tecla="a" aria-label="Esquerda">←</button>
+    <button data-tecla="w" aria-label="Cima">↑</button>
+    <button data-tecla="s" aria-label="Baixo">↓</button>
+    <button data-tecla="d" aria-label="Direita">→</button>
+    <button data-tecla="z">Desfazer</button>
+    <button data-tecla="r">Reiniciar</button>
+  </div>
+
+  <p class="rodape">C++17 + SDL2 compilado para WebAssembly com Emscripten. O recorde fica salvo no seu navegador.</p>
+
+  <script>
+    var canvas = document.getElementById("canvas");
+    var Module = {
+      canvas: canvas,
+      onRuntimeInitialized: function () {
+        document.getElementById("carregando").remove();
+        canvas.focus();
+      },
+      print: function (t) { console.log(t); },
+      printErr: function (t) { console.warn(t); }
+    };
+
+    document.querySelectorAll("[data-tecla]").forEach(function (botao) {
+      botao.addEventListener("click", function () {
+        Module.ccall("web_tecla", null, ["number"], [botao.dataset.tecla.charCodeAt(0)]);
+        canvas.focus();
+      });
+    });
+  </script>
+  <script src="2048.js"></script>
+</body>
+</html>

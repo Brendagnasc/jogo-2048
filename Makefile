@@ -33,7 +33,30 @@ OBJS_S := $(SRCS_S:.cpp=.o)
 
 HDRS   := Types.h Observer.h GameLogic.h Renderer.h Controller.h Persistence.h
 
-.PHONY: all sdl run run_sdl debug clean
+# ── Versão web (WebAssembly) ─────────────────────────────────────────────────
+#  make web  →  web/2048.js + web/2048.wasm   (requer Emscripten: em++)
+#  O mesmo código SDL2 roda no navegador; SDL2 e SDL2_ttf vêm do Emscripten.
+#  As fontes DejaVu são embutidas no mesmo caminho do Linux, então
+#  SDLRenderer.cpp as encontra sem mudança. FONT_DIR pode ser trocado
+#  para compilar fora do Ubuntu.
+EMXX      := em++
+FONT_DIR  ?= /usr/share/fonts/truetype/dejavu
+FONT_VDIR := /usr/share/fonts/truetype/dejavu
+FONTS     := DejaVuSansMono-Bold.ttf DejaVuSans-Bold.ttf DejaVuSans.ttf
+WEB_SRCS  := main_sdl.cpp SDLRenderer.cpp SDLController.cpp Renderer.cpp Persistence.cpp
+WEB_FLAGS := $(STD) -O2 -fexceptions -sUSE_SDL=2 -sUSE_SDL_TTF=2 -lidbfs.js \
+             -sALLOW_MEMORY_GROWTH -sENVIRONMENT=web \
+             -sEXPORTED_FUNCTIONS=_main,_web_iniciar,_web_tecla \
+             -sEXPORTED_RUNTIME_METHODS=ccall \
+             $(foreach f,$(FONTS),--embed-file $(FONT_DIR)/$(f)@$(FONT_VDIR)/$(f))
+
+web: web/2048.js
+
+web/2048.js: $(WEB_SRCS) $(HDRS) SDLRenderer.h SDLController.h
+	$(EMXX) $(WEB_FLAGS) $(WEB_SRCS) -o $@
+	@echo "  ✓  web/2048.js  (sirva a pasta web/ por um servidor local)"
+
+.PHONY: all sdl run run_sdl debug clean web
 
 all: $(BIN_T)
 
