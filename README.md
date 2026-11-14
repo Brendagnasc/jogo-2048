@@ -15,11 +15,38 @@ terminal e uma versão gráfica em SDL2 com animações.
 
 ## Arquitetura
 
-- `GameLogic.h` — regras do jogo como template `GameLogic<N>`, sem depender de interface
-- `Observer.h` — padrão Observer: estatísticas e log reagem aos eventos do jogo
-- `Renderer.h` — interface `IRenderer`; `Renderer.cpp` (terminal) e `SDLRenderer.cpp` (SDL2) a implementam
-- `Controller.cpp` / `SDLController.cpp` — loop de cada versão
-- `Persistence.cpp` — save em arquivo texto com `<fstream>` e `std::optional`
+O código é dividido em três camadas. Cada uma só depende das que estão abaixo:
+
+```
+ui/terminal ──┐
+              ├──► app (GameSession) ──► core (regras puras)
+ui/sdl ───────┘          │
+                         └──► Persistence (arquivo / IndexedDB)
+```
+
+| Camada | Arquivos | Responsabilidade |
+|---|---|---|
+| `src/core` | `Board.h`, `Game.h`, `Types.h`, `Observer.h` | Regras do jogo, sem I/O. `board::slide` é uma função pura que devolve o caminho de cada peça; `Game<N>` guarda o estado, o undo e um gerador aleatório com semente |
+| `src/app` | `GameSession`, `Command.h`, `Observers.h`, `Persistence`, `Renderer.h` | Casos de uso compartilhados pelas duas interfaces: o que cada comando faz, quando salvar, estatísticas |
+| `src/ui/terminal` | `TerminalApp`, `TerminalRenderer` | Lê teclas, traduz para `Command` e desenha no terminal |
+| `src/ui/sdl` | `SDLApp`, `SDLRenderer`, `main.cpp` | Janela SDL2 (desktop e web) com animações |
+
+Padrões usados: **Observer** (estatísticas e log reagem aos eventos do jogo),
+**Strategy** (`IRenderer`), **Command/Memento** (pilha de undo) e injeção de
+dependência (semente do gerador, caminho do save, renderer).
+
+### Testes
+
+`tests/test_core.cpp` cobre as regras (fusão uma vez por movimento, ordem das
+fusões, caminho das peças, fim de jogo, vitória e undo) e a sessão (save e
+estatísticas). Como o gerador aceita semente, as partidas são reproduzíveis.
+
+```bash
+make test
+```
+
+O GitHub Actions roda os testes e compila as versões desktop a cada push; a
+demo só é publicada se tudo passar.
 
 ## Compilar
 
@@ -29,6 +56,7 @@ sudo apt install g++ make libsdl2-dev libsdl2-ttf-dev fonts-dejavu-core
 
 make          # versão terminal  → ./2048
 make sdl      # versão gráfica   → ./2048_sdl
+make test     # testes da lógica
 ```
 
 ## Versão web (WebAssembly)
@@ -36,7 +64,7 @@ make sdl      # versão gráfica   → ./2048_sdl
 O mesmo código SDL2 é compilado para WebAssembly com [Emscripten](https://emscripten.org/)
 (que já traz SDL2 e SDL2_ttf). As diferenças ficam isoladas em `#ifdef __EMSCRIPTEN__`:
 
-- o loop `while` vira um quadro por `requestAnimationFrame` (`SDLController::step`)
+- o loop `while` vira um quadro por `requestAnimationFrame` (`SDLApp::step`)
 - o recorde é salvo no IndexedDB do navegador (IDBFS montado em `/save`)
 - gesto de deslizar e botões na página para jogar no celular
 
