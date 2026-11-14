@@ -43,7 +43,7 @@ SRCS_T := $(APP_SRCS) $(wildcard src/ui/terminal/*.cpp)
 BIN_S  := 2048_sdl
 SRCS_S := $(APP_SRCS) $(wildcard src/ui/sdl/*.cpp)
 
-BIN_TEST  := $(BUILD)/tests
+BIN_TEST  := $(BUILD)/run_tests
 SRCS_TEST := $(APP_SRCS) tests/test_core.cpp
 
 obj = $(patsubst %.cpp,$(BUILD)/%.o,$(1))
