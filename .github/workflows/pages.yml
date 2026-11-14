@@ -16,7 +16,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Testes da lógica + compilação das versões desktop (terminal e SDL2) com g++.
+  # A demo só é publicada se este job passar.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependências SDL2
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-ttf-dev
+
+      - name: Testes
+        run: make test
+
+      - name: Compilar versões desktop
+        run: make all sdl
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
