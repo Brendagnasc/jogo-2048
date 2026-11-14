@@ -124,22 +124,33 @@ void SDLRenderer::layout() {
     cellSz_  = (boardSz_ - (BOARD_N + 1) * GAP) / BOARD_N;
 }
 
-float SDLRenderer::cx(int col) const {
-    return static_cast<float>(boardX_ + GAP + col*(cellSz_+GAP) + cellSz_/2);
+// Antes a origem do deslize era o CENTRO da célula, mas o desenho usa o
+// canto: a peça partia meio quadrado deslocada. Agora tudo usa o canto.
+float SDLRenderer::cellX(int col) const {
+    return static_cast<float>(boardX_ + GAP + col*(cellSz_+GAP));
 }
-float SDLRenderer::cy(int row) const {
-    return static_cast<float>(boardY_ + GAP + row*(cellSz_+GAP) + cellSz_/2);
+float SDLRenderer::cellY(int row) const {
+    return static_cast<float>(boardY_ + GAP + row*(cellSz_+GAP));
+}
+
+// ── animate ───────────────────────────────────────────────────────────────────
+void SDLRenderer::animate(const std::vector<TileMove>& tiles,
+                          const std::optional<Spawn>& spawn) {
+    for (const auto& t : tiles) {
+        if (t.merged) triggerMerge(t.to.row, t.to.col);
+        else          triggerSlide(t.to.row, t.to.col, cellX(t.from.col), cellY(t.from.row));
+    }
+    if (spawn) triggerPop(spawn->at.row, spawn->at.col);
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
-void SDLRenderer::render(const Grid<BOARD_N>& grid,
-                          int score, int best, int moves) {
+void SDLRenderer::render(const GameView& view) {
     stepAnims();
     SDL_SetRenderDrawColor(ren_.get(), P::BG.r, P::BG.g, P::BG.b, 255);
     SDL_RenderClear(ren_.get());
     drawBg();
-    drawHeader(score, best, moves);
-    drawBoard(grid);
+    drawHeader(view.score, view.best, view.moves);
+    drawBoard(*view.grid);
     drawHist();
     drawToast();
     SDL_RenderPresent(ren_.get());
@@ -295,21 +306,21 @@ void SDLRenderer::pushHistory(const HistEntry& e) {
 }
 
 // ── pollInput ────────────────────────────────────────────────────────────────
-char SDLRenderer::pollInput() {
+std::optional<Command> SDLRenderer::pollInput() {
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
-        if (ev.type == SDL_QUIT) { closed_=true; return 'q'; }
+        if (ev.type == SDL_QUIT) { closed_=true; return Command::Quit; }
         if (ev.type == SDL_KEYDOWN) {
             switch(ev.key.keysym.sym) {
-            case SDLK_w: case SDLK_UP:     return 'w';
-            case SDLK_s: case SDLK_DOWN:   return 's';
-            case SDLK_a: case SDLK_LEFT:   return 'a';
-            case SDLK_d: case SDLK_RIGHT:  return 'd';
-            case SDLK_z:                   return 'z';
-            case SDLK_r:                   return 'r';
+            case SDLK_w: case SDLK_UP:     return Command::MoveUp;
+            case SDLK_s: case SDLK_DOWN:   return Command::MoveDown;
+            case SDLK_a: case SDLK_LEFT:   return Command::MoveLeft;
+            case SDLK_d: case SDLK_RIGHT:  return Command::MoveRight;
+            case SDLK_z:                   return Command::Undo;
+            case SDLK_r:                   return Command::Restart;
 #ifndef __EMSCRIPTEN__
             // no navegador não existe "fechar a janela"
-            case SDLK_q: case SDLK_ESCAPE: closed_=true; return 'q';
+            case SDLK_q: case SDLK_ESCAPE: closed_=true; return Command::Quit;
 #endif
             default: break;
             }
@@ -324,12 +335,13 @@ char SDLRenderer::pollInput() {
             int dx = ev.button.x - swipeX_;
             int dy = ev.button.y - swipeY_;
             if (std::max(std::abs(dx), std::abs(dy)) >= SWIPE_MIN) {
-                if (std::abs(dx) > std::abs(dy)) return dx > 0 ? 'd' : 'a';
-                return dy > 0 ? 's' : 'w';
+                if (std::abs(dx) > std::abs(dy))
+                    return dx > 0 ? Command::MoveRight : Command::MoveLeft;
+                return dy > 0 ? Command::MoveDown : Command::MoveUp;
             }
         }
     }
-    return '\0';
+    return std::nullopt;
 }
 
 // ── showMsg ───────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 /*
- * main_sdl.cpp  —  Ponto de entrada da versão gráfica SDL2
+ * main.cpp  —  Ponto de entrada da versão gráfica SDL2 (desktop e web)
  *
  * BUILD:   make sdl        →  gera ./2048_sdl
  * RODAR:   make run_sdl    →  compila e abre a janela
@@ -8,7 +8,7 @@
  * INSTALAR SDL2 (Ubuntu/Debian):
  *   sudo apt install libsdl2-dev libsdl2-ttf-dev fonts-dejavu-core
  */
-#include "SDLController.h"
+#include "SDLApp.h"
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
@@ -16,12 +16,12 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 
-// No navegador o controlador precisa sobreviver ao fim de main(): o loop é
+// No navegador o app precisa sobreviver ao fim de main(): o loop é
 // dirigido pelo requestAnimationFrame, não por um while bloqueante.
-static SDLController* g_ctrl = nullptr;
+static SDLApp* g_app = nullptr;
 
 static void quadro(void*) {
-    if (g_ctrl && !g_ctrl->step()) emscripten_cancel_main_loop();
+    if (g_app && !g_app->step()) emscripten_cancel_main_loop();
 }
 
 extern "C" {
@@ -29,8 +29,10 @@ extern "C" {
 // Chamado pelo JavaScript depois que o IndexedDB foi carregado em /save.
 EMSCRIPTEN_KEEPALIVE void web_iniciar() {
     try {
-        g_ctrl = new SDLController();
-        g_ctrl->start();
+        GameSession::Options opts;
+        opts.logEvents = false;   // sem log no console do navegador
+        g_app = new SDLApp(std::move(opts));
+        g_app->start();
         emscripten_set_main_loop_arg(quadro, nullptr, 0, false);
     } catch (const std::exception& e) {
         std::cerr << "Erro ao iniciar o jogo: " << e.what() << "\n";
@@ -39,7 +41,9 @@ EMSCRIPTEN_KEEPALIVE void web_iniciar() {
 
 // Botões da página (para celular): mesmas teclas do teclado (w a s d z r).
 EMSCRIPTEN_KEEPALIVE void web_tecla(char c) {
-    if (g_ctrl) g_ctrl->handleInput(c);
+    if (!g_app) return;
+    auto cmd = commandFromKey(c);
+    if (cmd && *cmd != Command::Quit) g_app->handle(*cmd);   // na web não há "sair"
 }
 
 }
@@ -61,8 +65,8 @@ int main() {
 
 int main() {
     try {
-        SDLController ctrl;
-        ctrl.run();
+        SDLApp app;
+        app.run();
     } catch (const std::exception& e) {
         std::cerr << "\nErro ao iniciar o jogo: " << e.what() << "\n\n"
                   << "Certifique-se de que o SDL2 esta instalado:\n"

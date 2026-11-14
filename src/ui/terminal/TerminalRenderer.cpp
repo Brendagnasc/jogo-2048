@@ -20,7 +20,8 @@
  *   entre diferentes .cpp quando o linker junta os objetos.
  */
 
-#include "Renderer.h"
+#include "TerminalApp.h"   // declara createTerminalRenderer()
+#include "../../app/Renderer.h"
 
 #include <iostream>
 #include <iomanip>   // std::setw — largura mínima de campo na saída
@@ -122,7 +123,9 @@ void numRow(const Grid<BOARD_N>& g, int r) {
 // puramente virtuais. 'final' impede que seja herdada novamente.
 class TerminalRenderer final : public IRenderer {
 public:
-    void render(const Grid<BOARD_N>& g, int score, int best, int moves) override {
+    void render(const GameView& view) override {
+        const Grid<BOARD_N>& g = *view.grid;
+        const int score = view.score, best = view.best, moves = view.moves;
         cls();
         // Cabeçalho
         std::cout << "\n  " << BOLD << "2048" << RST

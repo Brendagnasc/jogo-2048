@@ -40,6 +40,10 @@
 #include <sstream>    // std::ostringstream
 #include <optional>   // std::optional, std::nullopt
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 // ── Construtor ────────────────────────────────────────────────────────────────
 // std::move(path): transfere a string sem copiar (move semantics)
 // O parâmetro 'path' é passado por valor propositalmente: o caller pode passar
@@ -119,6 +123,14 @@ bool Persistence::save(const SaveData& data) const {
         std::cerr << "[Persistence] Erro durante a escrita em: " << path_ << "\n";
         return false;
     }
+    out.close();   // garante os bytes no arquivo antes de sincronizar
+
+#ifdef __EMSCRIPTEN__
+    // No navegador o arquivo está num sistema de arquivos em memória; o
+    // syncfs copia para o IndexedDB, onde sobrevive a recarregar a página.
+    // Fica aqui (e não no controlador) porque é detalhe de onde o save mora.
+    EM_ASM( FS.syncfs(false, function (err) { if (err) console.warn("syncfs:", err); }); );
+#endif
 
     return true;
     // Aqui 'out' sai de escopo → destrutor é chamado → arquivo é fechado e

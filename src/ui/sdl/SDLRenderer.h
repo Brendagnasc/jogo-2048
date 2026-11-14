@@ -5,14 +5,16 @@
  * Implementa IRenderer abrindo uma janela real no desktop.
  * Tema: dark elegante, tiles coloridos, animações suaves.
  */
-#include "Renderer.h"
-#include "Types.h"
+#include "../../app/Command.h"
+#include "../../app/Renderer.h"
+#include "../../core/Types.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <array>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
-#include <array>
 
 // ── RAII deleters para recursos SDL ──────────────────────────────────────────
 struct DelWin { void operator()(SDL_Window*   p) noexcept { SDL_DestroyWindow(p);   }};
@@ -32,7 +34,7 @@ enum class AnimKind { Idle, Pop, Merge, Slide };
 struct CellAnim {
     AnimKind kind   = AnimKind::Idle;
     float    t      = 1.f;   // 0 = início, 1 = fim
-    float    fromX  = 0.f;   // pixel de origem (Slide)
+    float    fromX  = 0.f;   // canto superior esquerdo da célula de origem (Slide)
     float    fromY  = 0.f;
     bool     active = false;
 };
@@ -46,25 +48,28 @@ public:
     explicit SDLRenderer();
     ~SDLRenderer() override;
 
-    void render(const Grid<BOARD_N>& grid,
-                int score, int best, int moves) override;
+    void render(const GameView& view) override;
     void showMsg(const std::string& msg, bool err = false) override;
-    void showHelp() override {}
 
-    // API SDL-específica
-    void triggerPop  (int r, int c);
-    void triggerMerge(int r, int c);
-    void triggerSlide(int r, int c, float fromPixelX, float fromPixelY);
-    void pushHistory (const HistEntry& e);
+    // Anima um movimento a partir do caminho real de cada peça, informado
+    // pela lógica (MoveResult). Antes as animações eram deduzidas comparando
+    // a grade antes/depois, o que errava a origem quando havia valores iguais.
+    void animate(const std::vector<TileMove>& tiles, const std::optional<Spawn>& spawn);
+    void pushHistory(const HistEntry& e);
 
-    char pollInput();
+    // Lê teclado, mouse e toque e traduz para Command
+    std::optional<Command> pollInput();
     bool closed() const { return closed_; }
 
-    // Centro em pixels de uma célula (para cálculo de slide)
-    float cx(int col) const;
-    float cy(int row) const;
-
 private:
+    // Canto superior esquerdo de uma célula, em pixels
+    float cellX(int col) const;
+    float cellY(int row) const;
+
+    void triggerPop  (int r, int c);
+    void triggerMerge(int r, int c);
+    void triggerSlide(int r, int c, float fromX, float fromY);
+
     WinPtr win_;
     RenPtr ren_;
     FntPtr fBig_, fMid_, fSml_;

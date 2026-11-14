@@ -6,3 +6,4 @@
 # saída do Emscripten (gerada no GitHub Actions)
 web/2048.js
 web/2048.wasm
+build/
